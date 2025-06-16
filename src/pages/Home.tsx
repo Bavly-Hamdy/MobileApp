@@ -10,7 +10,7 @@ import { ProfileSkeleton } from "@/components/ProfileSkeleton";
 import { auth, database } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { ref, get } from "firebase/database";
-import "./Home.css"; // Import the new CSS file
+import "./Home.css"; // Import the CSS file
 
 const Home = () => {
   const { t } = useAppContext();
@@ -43,7 +43,7 @@ const Home = () => {
           });
         });
     }
-  }, [toast]); // Added toast to dependency array
+  }, [toast]);
 
   // Set a timeout to show fallback UI if profile data doesn't load quickly
   useEffect(() => {
@@ -211,7 +211,7 @@ const Home = () => {
               </div>
             </div>
 
-            <div className="vital-card animate-float delay-200">
+            <div className="vital-card delay-200">
               <div className="flex items-center space-x-2 mb-2">
                 <Heart className="text-health-danger-500" size={20} />
                 <span className="font-medium">{t("heartRate")}</span>
@@ -224,7 +224,7 @@ const Home = () => {
               </div>
             </div>
 
-            <div className="vital-card animate-float delay-400">
+            <div className="vital-card delay-400">
               <div className="flex items-center space-x-2 mb-2">
                 <ThermometerSun className="text-health-warning-500" size={20} />
                 <span className="font-medium">{t("temperature")}</span>
@@ -237,7 +237,7 @@ const Home = () => {
               </div>
             </div>
 
-            <div className="vital-card animate-float delay-600">
+            <div className="vital-card delay-600">
               <div className="flex items-center space-x-2 mb-2">
                 <Droplet className="text-health-primary-300" size={20} />
                 <span className="font-medium">{t("oxygenSaturation")}</span>
