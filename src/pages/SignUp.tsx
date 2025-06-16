@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAppContext } from "@/contexts/AppContext";
@@ -6,9 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { useToast } from "@/components/ui/use-toast";
-import { auth, firestore, database } from "@/lib/firebase";
+import { auth, database } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { setDoc, doc } from "firebase/firestore";
 import { ref, set } from "firebase/database";
 import { Loader } from "lucide-react";
 import PersonalInfoFields from "@/components/signup/PersonalInfoFields";
@@ -38,15 +36,23 @@ const SignUp = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  const { register, handleSubmit, watch, formState: { errors }, setValue, getValues, control } = useForm<SignUpFormInputs>({
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+    setValue,
+    getValues,
+    control,
+  } = useForm<SignUpFormInputs>({
     defaultValues: {
       gender: "",
       diabetesStatus: "no",
       hypertensionStatus: "no",
       strokeHistory: "no",
       smokingStatus: "never",
-    }
+    },
   });
 
   const validateDateOfBirth = (date: Date) => {
@@ -58,9 +64,8 @@ const SignUp = () => {
 
   const onSubmit: SubmitHandler<SignUpFormInputs> = async (data) => {
     setIsLoading(true);
-    
+
     try {
-      // Validate date of birth
       const dobValidation = validateDateOfBirth(data.dateOfBirth);
       if (dobValidation !== true) {
         toast({
@@ -71,22 +76,26 @@ const SignUp = () => {
         setIsLoading(false);
         return;
       }
-      
+
       // Create user in Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        data.email,
+        data.password
+      );
       const user = userCredential.user;
-      
+
       // Calculate BMI
       const bmi = data.weight / ((data.height / 100) ** 2);
-      
-      // Store user data in Firestore
-      await setDoc(doc(firestore, "users", user.uid), {
+
+      // Save user info in Realtime Database
+      await set(ref(database, `users/${user.uid}`), {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
         age: data.age,
         gender: data.gender,
-        dateOfBirth: data.dateOfBirth,
+        dateOfBirth: data.dateOfBirth.toISOString(),
         height: data.height,
         weight: data.weight,
         bmi: bmi,
@@ -95,23 +104,23 @@ const SignUp = () => {
         strokeHistory: data.strokeHistory,
         smokingStatus: data.smokingStatus,
         chronicConditions: data.chronicConditions,
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
       });
-      
-      // Display success message
+
       toast({
         title: "Account created!",
         description: "Your account has been created successfully. Please sign in.",
       });
-      
-      // Navigate to the sign in page
+
       navigate("/signin");
-      
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error signing up:", error);
       toast({
         title: "Error creating account",
-        description: error.message || "An error occurred during sign up.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "An error occurred during sign up.",
         variant: "destructive",
       });
     } finally {
@@ -124,37 +133,36 @@ const SignUp = () => {
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-primary">{t("signUp")}</h1>
-          <p className="text-muted-foreground mt-2">Create your healthcare account</p>
+          <p className="text-muted-foreground mt-2">
+            Create your healthcare account
+          </p>
         </div>
 
         <Card className="p-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            {/* Account Information */}
-            <AccountInfoFields 
-              register={register} 
-              errors={errors} 
+            <AccountInfoFields
+              register={register}
+              errors={errors}
               watch={watch}
-              t={t} 
+              t={t}
             />
 
-            {/* Personal Health Information */}
-            <PersonalInfoFields 
-              register={register} 
-              errors={errors} 
-              setValue={setValue} 
+            <PersonalInfoFields
+              register={register}
+              errors={errors}
+              setValue={setValue}
               getValues={getValues}
               t={t}
             />
 
-            {/* Medical History */}
-            <MedicalHistoryFields 
-              setValue={setValue} 
+            <MedicalHistoryFields
+              setValue={setValue}
               register={register}
-              t={t} 
+              t={t}
             />
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full health-gradient hover:opacity-90 transition-opacity"
               disabled={isLoading}
             >
