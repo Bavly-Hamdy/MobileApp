@@ -105,7 +105,7 @@ git push -u origin main
 
 ## 👥 Team Members & Roles
 
-* **Pavly Hamdy** (Full Stack Developer)
+* **Bavly Hamdy** (Full Stack Developer)
 
   * Front-end (Web & Mobile)
   * Device data integration
