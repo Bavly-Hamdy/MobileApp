@@ -1,6 +1,5 @@
-
 import { initializeApp } from "firebase/app";
-import { getAuth, onAuthStateChanged as onAuthStateChangedFunction } from "firebase/auth";
+import { getAuth, onAuthStateChanged as onAuthStateChangedFunction, User } from "firebase/auth";
 import { getFirestore, enableIndexedDbPersistence, connectFirestoreEmulator, enableNetwork, disableNetwork } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getAnalytics, isSupported } from "firebase/analytics";
@@ -79,7 +78,7 @@ export const withRetry = async <T>(
 };
 
 // Enhanced authentication state monitoring
-export const onAuthStateChanged = (callback: (user: any) => void) => {
+export const onAuthStateChanged = (callback: (user: User | null) => void) => {
   return onAuthStateChangedFunction(auth, (user) => {
     console.log('Firebase Auth: State changed:', user ? `User ${user.uid}` : 'No user');
     callback(user);
@@ -93,13 +92,17 @@ const enableOfflineCapabilities = async () => {
       forceOwnership: false
     });
     console.log("Firebase: Offline persistence enabled successfully");
-  } catch (error: any) {
-    if (error.code === 'failed-precondition') {
-      console.warn("Firebase: Multiple tabs open, persistence can only be enabled in one tab at a time");
-    } else if (error.code === 'unimplemented') {
-      console.warn("Firebase: The current browser does not support offline persistence");
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error) {
+      if ((error as { code: string }).code === 'failed-precondition') {
+        console.warn("Firebase: Multiple tabs open, persistence can only be enabled in one tab at a time");
+      } else if ((error as { code: string }).code === 'unimplemented') {
+        console.warn("Firebase: The current browser does not support offline persistence");
+      } else {
+        console.error("Firebase: Error enabling offline persistence:", error);
+      }
     } else {
-      console.error("Firebase: Error enabling offline persistence:", error);
+      console.error("Firebase: Unknown error enabling offline persistence:", error);
     }
   }
 };
