@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { useUserProfile } from "@/contexts/UserProfileContext";
@@ -8,8 +7,10 @@ import MainLayout from "@/components/layout/MainLayout";
 import { Activity, ThermometerSun, Heart, Droplet } from "lucide-react";
 import { useReminders } from "@/hooks/useReminders";
 import { ProfileSkeleton } from "@/components/ProfileSkeleton";
-import { auth } from "@/lib/firebase";
+import { auth, database } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { ref, get } from "firebase/database";
+import "./Home.css"; // Import the new CSS file
 
 const Home = () => {
   const { t } = useAppContext();
@@ -17,13 +18,39 @@ const Home = () => {
   const { reminders, isLoading: remindersLoading, hasError: remindersError, toggleComplete } = useReminders();
   const { toast } = useToast();
   const [showFallback, setShowFallback] = useState(false);
-  
+  const [firebaseFirstName, setFirebaseFirstName] = useState<string | null>(null);
+
+  // Fetch firstName directly from Firebase Realtime Database as a fallback
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (user) {
+      const userRef = ref(database, `users/${user.uid}`);
+      get(userRef)
+        .then((snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.val();
+            setFirebaseFirstName(data.firstName || null);
+          } else {
+            console.warn("No user data found in Firebase");
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching user data:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load user data. Please try again.",
+            variant: "destructive",
+          });
+        });
+    }
+  }, [toast]); // Added toast to dependency array
+
   // Set a timeout to show fallback UI if profile data doesn't load quickly
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowFallback(true);
     }, 1500); // Show fallback after 1.5 seconds
-    
+
     return () => clearTimeout(timer);
   }, []);
 
@@ -40,10 +67,10 @@ const Home = () => {
 
   // Format timestamp
   const formatTime = (date: Date) => {
-    return new Intl.DateTimeFormat('default', { 
-      hour: 'numeric', 
+    return new Intl.DateTimeFormat('default', {
+      hour: 'numeric',
       minute: 'numeric',
-      hour12: true 
+      hour12: true
     }).format(date);
   };
 
@@ -66,21 +93,26 @@ const Home = () => {
 
   // Enhanced greeting rendering with live Firebase data and fallback
   const renderGreeting = () => {
-    // If we have a valid profile with firstName, show it immediately
+    // Prioritize Firebase-fetched firstName if available
+    if (firebaseFirstName && firebaseFirstName.trim()) {
+      return <span>Hello, {firebaseFirstName}</span>;
+    }
+
+    // Fallback to profile.firstName if available
     if (profile?.firstName && profile.firstName.trim()) {
       return <span>Hello, {profile.firstName}</span>;
     }
-    
+
     // If still loading and not timed out yet, show skeleton
     if (profileLoading && !showFallback) {
       return <ProfileSkeleton type="greeting" />;
     }
-    
+
     // If there's an error or we've timed out, show fallback
     if (profileError || showFallback) {
       return <span>Hello, Guest</span>;
     }
-    
+
     // Default fallback
     return <span>Hello, Guest</span>;
   };
@@ -88,7 +120,7 @@ const Home = () => {
   const handleToggleReminder = async (reminderId: string, completed: boolean) => {
     try {
       await toggleComplete(reminderId, !completed);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error toggling reminder:", error);
       toast({
         title: "Error",
@@ -135,9 +167,9 @@ const Home = () => {
           </div>
           <div className="flex space-x-2">
             <Button variant="ghost" size="sm">{t("ignore")}</Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="text-health-success-500 border-health-success-500 hover:bg-health-success-50"
               onClick={() => handleToggleReminder(reminder.id, reminder.completed)}
             >
@@ -179,7 +211,7 @@ const Home = () => {
               </div>
             </div>
 
-            <div className="vital-card animate-float" style={{animationDelay: "0.2s"}}>
+            <div className="vital-card animate-float delay-200">
               <div className="flex items-center space-x-2 mb-2">
                 <Heart className="text-health-danger-500" size={20} />
                 <span className="font-medium">{t("heartRate")}</span>
@@ -192,7 +224,7 @@ const Home = () => {
               </div>
             </div>
 
-            <div className="vital-card animate-float" style={{animationDelay: "0.4s"}}>
+            <div className="vital-card animate-float delay-400">
               <div className="flex items-center space-x-2 mb-2">
                 <ThermometerSun className="text-health-warning-500" size={20} />
                 <span className="font-medium">{t("temperature")}</span>
@@ -205,7 +237,7 @@ const Home = () => {
               </div>
             </div>
 
-            <div className="vital-card animate-float" style={{animationDelay: "0.6s"}}>
+            <div className="vital-card animate-float delay-600">
               <div className="flex items-center space-x-2 mb-2">
                 <Droplet className="text-health-primary-300" size={20} />
                 <span className="font-medium">{t("oxygenSaturation")}</span>
