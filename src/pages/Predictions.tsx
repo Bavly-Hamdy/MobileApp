@@ -4,7 +4,18 @@ import { useUserProfile } from "@/contexts/UserProfileContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import MainLayout from "@/components/layout/MainLayout";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
+} from "recharts";
 import { AlertCircle, Download, RefreshCw } from "lucide-react";
 import { useReminders } from "@/hooks/useReminders";
 import { useGlucoseReadings } from "@/hooks/useGlucoseReadings";
@@ -13,44 +24,78 @@ import { useToast } from "@/hooks/use-toast";
 import { ProfileSkeleton } from "@/components/ProfileSkeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { auth, database } from "@/lib/firebase";
+import { ref, onValue } from "firebase/database";
 
 const Predictions = () => {
   const { t } = useAppContext();
-  const { profile, bmi, bmiCategory, isLoading: profileLoading, hasError: profileError } = useUserProfile();
+  const {
+    profile,
+    bmi,
+    bmiCategory,
+    isLoading: profileLoading,
+    hasError: profileError
+  } = useUserProfile();
   const { reminders } = useReminders();
   const { readings } = useGlucoseReadings();
   const { toast } = useToast();
   const [showFallback, setShowFallback] = useState(false);
 
-  // Set a timeout to show fallback UI if height or weight is missing after 2 seconds
+  const [height, setHeight] = useState<number | null>(null);
+  const [weight, setWeight] = useState<number | null>(null);
+  const [loadingUserData, setLoadingUserData] = useState(true);
+
   useEffect(() => {
-    if (!profileLoading && (!profile?.height || !profile?.weight)) {
+    const fetchHeightWeight = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const userRef = ref(database, `users/${user.uid}`);
+      onValue(
+        userRef,
+        (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            setHeight(data.height ?? null);
+            setWeight(data.weight ?? null);
+          }
+          setLoadingUserData(false);
+        },
+        () => {
+          setLoadingUserData(false);
+        }
+      );
+    };
+
+    fetchHeightWeight();
+  }, []);
+
+  useEffect(() => {
+    if (!profileLoading && (!height || !weight)) {
       const timer = setTimeout(() => {
         setShowFallback(true);
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [profileLoading, profile]);
+  }, [profileLoading, height, weight]);
 
-  // Mock prediction data
-  const diabetesRisk = 35; // Percentage
-  const heartDiseaseRisk = 25; // Percentage
+  const diabetesRisk = 35;
+  const heartDiseaseRisk = 25;
 
-  // Mock future prediction data
   const futurePredictionData = [
     { month: "Jan", diabetesRisk: 35, heartDiseaseRisk: 25 },
     { month: "Feb", diabetesRisk: 34, heartDiseaseRisk: 24 },
     { month: "Mar", diabetesRisk: 33, heartDiseaseRisk: 26 },
     { month: "Apr", diabetesRisk: 31, heartDiseaseRisk: 23 },
     { month: "May", diabetesRisk: 32, heartDiseaseRisk: 22 },
-    { month: "Jun", diabetesRisk: 30, heartDiseaseRisk: 23 },
+    { month: "Jun", diabetesRisk: 30, heartDiseaseRisk: 23 }
   ];
 
   const diabetesFactors = [
     { name: "Age", value: 20 },
     { name: "BMI", value: 30 },
     { name: "Blood Sugar", value: 40 },
-    { name: "Family History", value: 10 },
+    { name: "Family History", value: 10 }
   ];
 
   const heartDiseaseFactors = [
@@ -58,16 +103,16 @@ const Predictions = () => {
     { name: "Blood Pressure", value: 30 },
     { name: "Cholesterol", value: 25 },
     { name: "Heart Rate", value: 15 },
-    { name: "Activity Level", value: 15 },
+    { name: "Activity Level", value: 15 }
   ];
 
   const COLORS = ["#0967d2", "#47a3f3", "#7cc4fa", "#bae3ff", "#e6f7ff"];
 
   const getBmiColor = (bmi: number) => {
-    if (bmi < 18.5) return "text-health-warning-500"; // Underweight
-    if (bmi < 25) return "text-health-success-500"; // Normal
-    if (bmi < 30) return "text-health-warning-500"; // Overweight
-    return "text-health-danger-500"; // Obese
+    if (bmi < 18.5) return "text-health-warning-500";
+    if (bmi < 25) return "text-health-success-500";
+    if (bmi < 30) return "text-health-warning-500";
+    return "text-health-danger-500";
   };
 
   const handleExportPDF = async () => {
@@ -75,7 +120,7 @@ const Predictions = () => {
       toast({
         title: "Error",
         description: "Profile data not available for export.",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
@@ -87,18 +132,18 @@ const Predictions = () => {
         reminders,
         glucoseReadings: readings,
         bmi: bmi || undefined,
-        bmiCategory: bmiCategory || undefined,
+        bmiCategory: bmiCategory || undefined
       });
       toast({
         title: "Export successful",
-        description: "Your health report has been downloaded successfully.",
+        description: "Your health report has been downloaded successfully."
       });
     } catch (error) {
       console.error("Error exporting PDF:", error);
       toast({
         title: "Export failed",
         description: "Failed to export PDF. Please try again.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
@@ -107,28 +152,31 @@ const Predictions = () => {
     try {
       toast({
         title: "Profile data",
-        description: "Using latest profile data from the server.",
+        description: "Using latest profile data from the server."
       });
     } catch (error) {
       console.error("Error refreshing profile:", error);
       toast({
         title: "Refresh failed",
         description: "Failed to refresh profile data. Please try again.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
 
-  // Render BMI section with form fields pre-populated from profile
   const renderBMISection = () => {
-    if (profile?.height && profile?.weight && profile.height > 0 && profile.weight > 0) {
-      const heightM = profile.height / 100;
-      const calculatedBMI = (profile.weight / (heightM * heightM)).toFixed(1);
-      const category = bmiCategory || (
-        parseFloat(calculatedBMI) < 18.5 ? 'Underweight' :
-        parseFloat(calculatedBMI) < 25 ? 'Normal' :
-        parseFloat(calculatedBMI) < 30 ? 'Overweight' : 'Obese'
-      );
+    if (height && weight && height > 0 && weight > 0) {
+      const heightM = height / 100;
+      const calculatedBMI = (weight / (heightM * heightM)).toFixed(1);
+      const category =
+        bmiCategory ||
+        (parseFloat(calculatedBMI) < 18.5
+          ? "Underweight"
+          : parseFloat(calculatedBMI) < 25
+          ? "Normal"
+          : parseFloat(calculatedBMI) < 30
+          ? "Overweight"
+          : "Obese");
 
       return (
         <div className="space-y-4">
@@ -138,7 +186,7 @@ const Predictions = () => {
               <Input
                 id="height"
                 type="number"
-                value={profile.height}
+                value={height}
                 readOnly
                 className="mt-1 bg-gray-100"
               />
@@ -148,7 +196,7 @@ const Predictions = () => {
               <Input
                 id="weight"
                 type="number"
-                value={profile.weight}
+                value={weight}
                 readOnly
                 className="mt-1 bg-gray-100"
               />
@@ -163,31 +211,23 @@ const Predictions = () => {
               readOnly
               className="mt-1 bg-gray-100"
             />
-            <p className={`font-medium ${getBmiColor(parseFloat(calculatedBMI))}`}>{category}</p>
+            <p className={`font-medium ${getBmiColor(parseFloat(calculatedBMI))}`}>
+              {category}
+            </p>
           </div>
         </div>
       );
     }
 
-    if (profileLoading && !showFallback) {
+    if (loadingUserData && !showFallback) {
       return <ProfileSkeleton type="bmi" />;
-    }
-
-    if (profileError || showFallback) {
-      return (
-        <div className="text-center py-8">
-          <AlertCircle className="mx-auto mb-2 text-health-warning-500" size={32} />
-          <p className="text-muted-foreground mb-2">Please complete your profile</p>
-          <p className="text-sm text-muted-foreground mb-4">Add your height and weight in the Settings page</p>
-        </div>
-      );
     }
 
     return (
       <div className="text-center py-8">
         <AlertCircle className="mx-auto mb-2 text-health-warning-500" size={32} />
-        <p className="text-muted-foreground mb-2">No profile data available</p>
-        <p className="text-sm text-muted-foreground">Please complete your profile to view BMI and predictions</p>
+        <p className="text-muted-foreground mb-2">No height or weight data found</p>
+        <p className="text-sm text-muted-foreground">Please complete your profile</p>
       </div>
     );
   };
@@ -209,13 +249,11 @@ const Predictions = () => {
           </div>
         </div>
 
-        {/* BMI Section with pre-populated form fields */}
         <Card className="p-4 mb-6">
           <h2 className="text-lg font-semibold mb-2">{t("bmi")}</h2>
           {renderBMISection()}
         </Card>
 
-        {/* Current Risk Assessment */}
         <div className="grid md:grid-cols-2 gap-6 mb-6">
           <Card className="p-4">
             <h2 className="text-lg font-semibold mb-4">{t("diabetesRisk")}</h2>
@@ -318,7 +356,6 @@ const Predictions = () => {
           </Card>
         </div>
 
-        {/* Future Predictions Chart */}
         <Card className="p-4 mb-6">
           <h2 className="text-lg font-semibold mb-2">Future Risk Predictions</h2>
           <div className="h-80">
@@ -351,7 +388,6 @@ const Predictions = () => {
           </div>
         </Card>
 
-        {/* Recommendations */}
         <Card className="p-4">
           <div className="flex items-start space-x-3">
             <AlertCircle className="text-health-warning-500 mt-1" size={24} />
