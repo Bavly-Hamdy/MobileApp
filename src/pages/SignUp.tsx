@@ -53,6 +53,7 @@ const SignUp = () => {
       hypertensionStatus: "no",
       strokeHistory: "no",
       smokingStatus: "never",
+      bpMedicine:"no",
     },
   });
 

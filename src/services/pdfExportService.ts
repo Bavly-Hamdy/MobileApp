@@ -15,6 +15,7 @@ interface UserProfile {
   hypertensionStatus: string;
   strokeHistory: string;
   smokingStatus: string;
+  bpMedicine: string;
   chronicConditions: string;
 }
 
@@ -129,6 +130,7 @@ class PDFExportService {
       `Weight: ${profile.weight} kg`,
       `Diabetes Status: ${profile.diabetesStatus}`,
       `Hypertension Status: ${profile.hypertensionStatus}`,
+      `Bp Medicine:${profile.bpMedicine}`,
       `Smoking Status: ${profile.smokingStatus}`
     ];
 

@@ -73,9 +73,10 @@ const MedicalHistoryFields: React.FC<MedicalHistoryFieldsProps> = ({
       <div>
         <Label>{t("bpMedicine")}</Label>
         <RadioGroup
-          onValueChange={(value) => setValue("bbmedicine", value)}
+          onValueChange={(value) => setValue("bpMedicine", value)}
           defaultValue="no"
           className="flex mt-2 space-x-4"
+          {...register("bpMedicine")}
         >
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="yes" id="bp-yes" />
