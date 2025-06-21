@@ -28,6 +28,7 @@ interface SignUpFormInputs {
   hypertensionStatus: string;
   strokeHistory: string;
   smokingStatus: string;
+  bpMedicine: string;
   chronicConditions: string;
 }
 
@@ -103,6 +104,7 @@ const SignUp = () => {
         hypertensionStatus: data.hypertensionStatus,
         strokeHistory: data.strokeHistory,
         smokingStatus: data.smokingStatus,
+        bpMedicine: data.bpMedicine,
         chronicConditions: data.chronicConditions,
         createdAt: new Date().toISOString(),
       });

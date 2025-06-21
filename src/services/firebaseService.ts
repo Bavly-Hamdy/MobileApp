@@ -34,15 +34,7 @@ export interface GlucoseReading {
   userId: string;
 }
 
-export interface UserProfile {
-  firstName: string;
-  lastName: string;
-  email: string;
-  weight: number;
-  height: number;
-  dateOfBirth: string;
-  medicalHistory?: string[];
-}
+
 
 export interface SavedMessage {
   id: string;

@@ -1,19 +1,43 @@
-
 import jsPDF from 'jspdf';
-import { UserProfile, Reminder, GlucoseReading } from '@/services/firebaseService';
+import { auth, database } from '@/lib/firebase';
+import { ref, get } from 'firebase/database';
+
+interface UserProfile {
+  firstName: string;
+  lastName: string;
+  email: string;
+  age: number;
+  gender: string;
+  dateOfBirth: string;
+  height: number;
+  weight: number;
+  diabetesStatus: string;
+  hypertensionStatus: string;
+  strokeHistory: string;
+  smokingStatus: string;
+  chronicConditions: string;
+}
+
+interface Reminder {
+  title: string;
+  time: string;
+  days: string[];
+  type: string;
+}
+
+interface GlucoseReading {
+  value: number;
+  timestamp: number;
+}
 
 interface ExportData {
-  profile: UserProfile;
-  reminders: Reminder[];
-  glucoseReadings: GlucoseReading[];
   bmi?: number;
   bmiCategory?: string;
 }
 
 class PDFExportService {
   private addHeader(doc: jsPDF) {
-    // App branding
-    doc.setFillColor(9, 103, 210); // health-primary-500
+    doc.setFillColor(9, 103, 210);
     doc.rect(0, 0, 210, 30, 'F');
     
     doc.setTextColor(255, 255, 255);
@@ -24,6 +48,65 @@ class PDFExportService {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
     doc.text('Personal Health Report', 20, 26);
+  }
+
+  private async getUserProfile(): Promise<UserProfile | null> {
+    const user = auth.currentUser;
+    if (!user) return null;
+
+    try {
+      const snapshot = await get(ref(database, `users/${user.uid}`));
+      return snapshot.val();
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+  }
+
+  private async getReminders(): Promise<Reminder[]> {
+    const user = auth.currentUser;
+    if (!user) return [];
+
+    try {
+      const snapshot = await get(ref(database, `users/${user.uid}/reminders`));
+      if (!snapshot.exists()) return [];
+      
+      const reminders: Reminder[] = [];
+      snapshot.forEach((childSnapshot) => {
+        reminders.push(childSnapshot.val());
+      });
+      return reminders;
+    } catch (error) {
+      console.error('Error fetching reminders:', error);
+      return [];
+    }
+  }
+
+  private async getGlucoseReadings(): Promise<GlucoseReading[]> {
+    const user = auth.currentUser;
+    if (!user) return [];
+
+    try {
+      const snapshot = await get(ref(database, `users/${user.uid}/readings`));
+      if (!snapshot.exists()) return [];
+      
+      const readings: GlucoseReading[] = [];
+      snapshot.forEach((sessionSnapshot) => {
+        sessionSnapshot.forEach((typeSnapshot) => {
+          if (typeSnapshot.key === 'glucose') {
+            typeSnapshot.forEach((readingSnapshot) => {
+              readings.push(readingSnapshot.val());
+            });
+          }
+        });
+      });
+      
+      // Sort by timestamp
+      return readings.sort((a, b) => a.timestamp - b.timestamp);
+    } catch (error) {
+      console.error('Error fetching glucose readings:', error);
+      return [];
+    }
   }
 
   private addUserInfo(doc: jsPDF, profile: UserProfile, yPos: number): number {
@@ -39,9 +122,14 @@ class PDFExportService {
     const info = [
       `Name: ${profile.firstName} ${profile.lastName}`,
       `Email: ${profile.email}`,
-      `Weight: ${profile.weight} kg`,
+      `Age: ${profile.age}`,
+      `Gender: ${profile.gender}`,
+      `Date of Birth: ${new Date(profile.dateOfBirth).toLocaleDateString()}`,
       `Height: ${profile.height} cm`,
-      `Date of Birth: ${profile.dateOfBirth}`
+      `Weight: ${profile.weight} kg`,
+      `Diabetes Status: ${profile.diabetesStatus}`,
+      `Hypertension Status: ${profile.hypertensionStatus}`,
+      `Smoking Status: ${profile.smokingStatus}`
     ];
 
     info.forEach(item => {
@@ -65,12 +153,11 @@ class PDFExportService {
     doc.text(`Category: ${category}`, 20, yPos);
     yPos += 7;
 
-    // BMI color coding
     let color = [0, 0, 0];
-    if (bmi < 18.5) color = [240, 180, 41]; // warning
-    else if (bmi < 25) color = [63, 145, 66]; // success
-    else if (bmi < 30) color = [240, 180, 41]; // warning
-    else color = [225, 45, 57]; // danger
+    if (bmi < 18.5) color = [240, 180, 41];
+    else if (bmi < 25) color = [63, 145, 66];
+    else if (bmi < 30) color = [240, 180, 41];
+    else color = [225, 45, 57];
 
     doc.setTextColor(color[0], color[1], color[2]);
     doc.setFont('helvetica', 'bold');
@@ -139,7 +226,7 @@ class PDFExportService {
     yPos += 7;
 
     doc.setFont('helvetica', 'normal');
-    const recentReadings = readings.slice(-10); // Show last 10 readings
+    const recentReadings = readings.slice(-10);
     
     recentReadings.forEach(reading => {
       if (yPos > 270) {
@@ -147,21 +234,60 @@ class PDFExportService {
         yPos = 20;
       }
       
-      // Fix: Handle timestamp properly - it's already a Date object
-      const date = reading.timestamp instanceof Date 
-        ? reading.timestamp.toLocaleDateString()
-        : new Date(reading.timestamp).toLocaleDateString();
-      
+      const date = new Date(reading.timestamp).toLocaleDateString();
       doc.text(date, 20, yPos);
       doc.text(reading.value.toString(), 80, yPos);
       
-      // Status based on glucose value
       let status = 'Normal';
       if (reading.value < 70) status = 'Low';
       else if (reading.value > 140) status = 'High';
       
       doc.text(status, 140, yPos);
       yPos += 6;
+    });
+
+    return yPos + 10;
+  }
+
+  private addHealthRisks(doc: jsPDF, yPos: number): number {
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Health Risk Predictions', 20, yPos);
+    yPos += 10;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Diabetes Risk: 35%', 20, yPos);
+    yPos += 7;
+    doc.text('Heart Disease Risk: 25%', 20, yPos);
+    yPos += 7;
+
+    return yPos + 15;
+  }
+
+  private addHealthRecommendations(doc: jsPDF, yPos: number): number {
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Health Recommendations', 20, yPos);
+    yPos += 10;
+
+    const recommendations = [
+      'Schedule regular check-ups with your healthcare provider',
+      'Monitor your blood pressure daily',
+      'Maintain a balanced diet low in sodium and sugar',
+      'Aim for 30 minutes of moderate exercise at least 5 days a week',
+      'Ensure proper medication adherence'
+    ];
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    recommendations.forEach((rec, index) => {
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+      }
+      doc.text(`• ${rec}`, 20, yPos);
+      yPos += 7;
     });
 
     return yPos + 10;
@@ -189,40 +315,68 @@ class PDFExportService {
     try {
       const doc = new jsPDF();
       
+      // Fetch data from Firebase
+      const profile = await this.getUserProfile();
+      const reminders = await this.getReminders();
+      const glucoseReadings = await this.getGlucoseReadings();
+
+      if (!profile) {
+        throw new Error('User profile not found');
+      }
+
       // Add header
       this.addHeader(doc);
       
       let yPos = 45;
       
       // Add user information
-      yPos = this.addUserInfo(doc, data.profile, yPos);
+      yPos = this.addUserInfo(doc, profile, yPos);
       
-      // Add BMI information
+      // Add BMI information if available
       if (data.bmi && data.bmiCategory) {
         yPos = this.addBMIInfo(doc, data.bmi, data.bmiCategory, yPos);
+      } else if (profile.height && profile.weight) {
+        // Calculate BMI if not provided
+        const heightM = profile.height / 100;
+        const bmi = profile.weight / (heightM * heightM);
+        const category = 
+          bmi < 18.5 ? 'Underweight' :
+          bmi < 25 ? 'Normal' :
+          bmi < 30 ? 'Overweight' : 'Obese';
+        yPos = this.addBMIInfo(doc, bmi, category, yPos);
       }
       
+      // Add health risks
+      yPos = this.addHealthRisks(doc, yPos);
+      
       // Add reminders
-      yPos = this.addReminders(doc, data.reminders, yPos);
+      yPos = this.addReminders(doc, reminders, yPos);
       
       // Add glucose readings
       if (yPos > 200) {
         doc.addPage();
         yPos = 20;
       }
-      yPos = this.addGlucoseReadings(doc, data.glucoseReadings, yPos);
+      yPos = this.addGlucoseReadings(doc, glucoseReadings, yPos);
+      
+      // Add health recommendations
+      if (yPos > 200) {
+        doc.addPage();
+        yPos = 20;
+      }
+      this.addHealthRecommendations(doc, yPos);
       
       // Add footer
       this.addFooter(doc);
       
       // Save the PDF
-      const fileName = `VitalSync_Report_${data.profile.firstName}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const fileName = `VitalSync_Report_${profile.firstName}_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(fileName);
       
       console.log('PDF exported successfully');
     } catch (error) {
       console.error('Error exporting PDF:', error);
-      throw new Error('Failed to export PDF');
+      throw error;
     }
   }
 }

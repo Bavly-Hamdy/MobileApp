@@ -116,21 +116,8 @@ const Predictions = () => {
   };
 
   const handleExportPDF = async () => {
-    if (!profile) {
-      toast({
-        title: "Error",
-        description: "Profile data not available for export.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     try {
-      console.log("Exporting PDF report");
       await pdfExportService.exportToPDF({
-        profile,
-        reminders,
-        glucoseReadings: readings,
         bmi: bmi || undefined,
         bmiCategory: bmiCategory || undefined
       });
